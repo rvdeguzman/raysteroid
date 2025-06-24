@@ -420,7 +420,7 @@ void CheckPlayerAsteroidHit(Player *player, Asteroid *asteroids, float dt) {
 int main(void) {
     SetConfigFlags(FLAG_WINDOW_HIGHDPI);
 
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "raylib starter");
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "raysteroids - asteroiods in C");
     SetTargetFPS(TARGET_FRAMERATE);
 
     Asteroid asteroids[MAX_ASTEROIDS];
