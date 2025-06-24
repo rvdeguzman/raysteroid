@@ -162,8 +162,26 @@ Asteroid CreateAsteroid() {
 
     // empty init
     Vector2 initpos = {0, 0};
-    initpos.x = rand() % SCREEN_WIDTH;
-    initpos.y = rand() % SCREEN_HEIGHT;
+    int edge = rand() % 4;  // 0=top, 1=right, 2=bottom, 3=left
+
+    switch (edge) {
+        case 0:
+            initpos.x = rand() % SCREEN_WIDTH;
+            initpos.y = -50 - (rand() % 100);
+            break;
+        case 1:
+            initpos.x = SCREEN_WIDTH + 50 + (rand() % 100);
+            initpos.y = rand() % SCREEN_HEIGHT;
+            break;
+        case 2:
+            initpos.x = rand() % SCREEN_WIDTH;
+            initpos.y = SCREEN_HEIGHT + 50 + (rand() % 100);
+            break;
+        case 3:
+            initpos.x = -50 - (rand() % 100);
+            initpos.y = rand() % SCREEN_HEIGHT;
+            break;
+    }
 
     float centerradius = 80.0f;
     Vector2 centerpos = {(float)SCREEN_WIDTH / 2,
@@ -183,7 +201,7 @@ Asteroid CreateAsteroid() {
     initvel = Vector2Scale(initvel, speed);
     float rotvel = rand() % 360;
     int size = 40 + (rand() % (100 - 40 + 1));
-    int sides = 3 + (rand() % (12 - 3 + 1));
+    int sides = 5 + (rand() % (12 - 5 + 1));
 
     Asteroid asteroid = {
         initpos,
@@ -196,7 +214,7 @@ Asteroid CreateAsteroid() {
         rotvel,
         0.0f,
         0.0f,
-        8.0f,
+        32.0f,
     };
     return asteroid;
 }
