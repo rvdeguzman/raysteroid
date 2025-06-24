@@ -164,13 +164,23 @@ Asteroid CreateAsteroid() {
     Vector2 initpos = {0, 0};
     initpos.x = rand() % SCREEN_WIDTH;
     initpos.y = rand() % SCREEN_HEIGHT;
-    // center of the screen
+
+    float centerradius = 80.0f;
     Vector2 centerpos = {(float)SCREEN_WIDTH / 2,
                          (float)SCREEN_HEIGHT /
                              2};  // should be random from area near center of screen
-    Vector2 initvel = Vector2Subtract(centerpos, initpos);  // good enough for now
+
+    float offset_angle = ((float)rand() / RAND_MAX) * 2.0f * PI;
+    float offset_distance = ((float)rand() / RAND_MAX) * centerradius;
+    Vector2 offset = {cos(offset_angle) * offset_distance, sin(offset_angle) * offset_distance};
+    // final position of the random point about center
+    Vector2 target = Vector2Add(centerpos, offset);
+
+    Vector2 initvel = Vector2Subtract(target, initpos);  // good enough for now
     initvel = Vector2Normalize(initvel);
-    initvel = Vector2Scale(initvel, 50.0f);
+    float speed = (float)30 + (rand() % (60 - 30 + 1));
+
+    initvel = Vector2Scale(initvel, speed);
     float rotvel = rand() % 360;
     int size = 40 + (rand() % (100 - 40 + 1));
     int sides = 3 + (rand() % (12 - 3 + 1));
@@ -216,21 +226,21 @@ void UpdateAsteroid(Asteroid *asteroid, float dt) {
 // apply a force to repulse asteroids away from each other
 void SeparateAsteroids(Asteroid *asteroids, int count, float dt) {
     float force = 150.0f;
-    
+
     for (int i = 0; i < count; i++) {
         if (!asteroids[i].active) continue;
-        
+
         Vector2 repulsion = Vector2Zero();
         int near = 0;
-        
+
         for (int j = 0; j < count; j++) {
             if (i == j || !asteroids[j].active) continue;
-            
+
             Vector2 diff = Vector2Subtract(asteroids[i].pos, asteroids[j].pos);
             float distance = Vector2Length(diff);
-            
+
             float radii = asteroids[i].size + asteroids[j].size;
-            
+
             if (distance < radii && distance > 0) {
                 Vector2 push_direction = Vector2Normalize(diff);
                 float push_strength = (radii - distance) / radii;
@@ -239,7 +249,7 @@ void SeparateAsteroids(Asteroid *asteroids, int count, float dt) {
                 near++;
             }
         }
-        
+
         if (near > 0) {
             repulsion = Vector2Scale(repulsion, 1.0f / near);
             Vector2 repulsevel = Vector2Scale(repulsion, dt);
@@ -247,7 +257,6 @@ void SeparateAsteroids(Asteroid *asteroids, int count, float dt) {
         }
     }
 }
-
 
 int main(void) {
     SetConfigFlags(FLAG_WINDOW_HIGHDPI);
