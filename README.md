@@ -8,5 +8,5 @@ very basic asteroids written in C code is pretty bad, mainly did this for practi
 - splitting asteroids
 
 ### resources
-- [andrew hamel codes][https://www.youtube.com/watch?v=abIlGCx_Yq8]
+- [andrew hamel codes](https://www.youtube.com/watch?v=abIlGCx_Yq8)
 - goat watched this at like 3am and started the project then and there
