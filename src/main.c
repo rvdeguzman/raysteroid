@@ -48,7 +48,8 @@ typedef struct {
     Vector2 pos;
     Vector2 vel;
     bool active;
-    AsteroidSize size;
+    AsteroidSize asteroidSize;
+    int size;
     int sides;  // for poly shape
     float accel;
     float rot;
@@ -200,13 +201,36 @@ Asteroid CreateAsteroid() {
 
     initvel = Vector2Scale(initvel, speed);
     float rotvel = rand() % 360;
-    int size = 40 + (rand() % (100 - 40 + 1));
     int sides = 5 + (rand() % (12 - 5 + 1));
+
+    AsteroidSize asteroidSize;
+    int prob = rand() % 100;
+    if (prob < 20) {
+        asteroidSize = ASTEROID_SMALL;
+    } else if (prob < 60) {
+        asteroidSize = ASTEROID_MEDIUM;
+    } else {
+        asteroidSize = ASTEROID_LARGE;
+    }
+
+    int size;
+    switch (asteroidSize) {
+        case ASTEROID_SMALL:
+            size = 20 + (rand() % 20);  // 20-40
+            break;
+        case ASTEROID_MEDIUM:
+            size = 40 + (rand() % 30);  // 40-70
+            break;
+        case ASTEROID_LARGE:
+            size = 70 + (rand() % 40);  // 70-110
+            break;
+    }
 
     Asteroid asteroid = {
         initpos,
         initvel,
         false,
+        asteroidSize,
         size,
         sides,
         0.0f,
@@ -276,6 +300,123 @@ void SeparateAsteroids(Asteroid *asteroids, int count, float dt) {
     }
 }
 
+Asteroid CreateAsteroidAtPos(Vector2 pos, AsteroidSize asteroidSize) {
+    float angle = ((float)rand() / RAND_MAX) * 2.0f * PI;  // random angle post split
+    float speed = 30 + (rand() % 31);
+    Vector2 vel = {cos(angle) * speed, sin(angle) * speed};
+
+    float rotvel = rand() % 360;
+    int sides = 5 + (rand() % (12 - 5 + 1));
+
+    int size;
+    switch (asteroidSize) {
+        case ASTEROID_SMALL:
+            size = 20 + (rand() % 20);
+            break;
+        case ASTEROID_MEDIUM:
+            size = 40 + (rand() % 30);
+            break;
+        case ASTEROID_LARGE:
+            size = 70 + (rand() % 40);
+            break;
+    }
+
+    Asteroid asteroid = {
+        pos,
+        vel,
+        false,
+        asteroidSize,
+        size,
+        sides,
+        0.0f,
+        0.0f,
+        rotvel,
+        0.0f,
+        0.0f,
+        32.0f,
+    };
+    return asteroid;
+}
+void SplitAsteroid(Asteroid *asteroid, Asteroid *asteroids) {
+    Vector2 parentPos = asteroid->pos;
+    AsteroidSize parentSize = asteroid->asteroidSize;
+
+    // deactivate parent
+    asteroid->active = false;
+
+    AsteroidSize size;
+    int nbSpawn;
+
+    switch (parentSize) {
+        case ASTEROID_LARGE:
+            size = ASTEROID_MEDIUM;
+            nbSpawn = 2;
+            break;
+        case ASTEROID_MEDIUM:
+            size = ASTEROID_SMALL;
+            nbSpawn = 2;
+            break;
+        case ASTEROID_SMALL:
+            return;
+    }
+
+    for (int spawn = 0; spawn < nbSpawn; spawn++) {
+        for (int i = 0; i < MAX_ASTEROIDS; i++) {
+            if (!asteroids[i].active) {
+                asteroids[i] = CreateAsteroidAtPos(parentPos, size);
+                asteroids[i].active = true;
+                asteroids[i].lifetime = 0.0f;
+                break;
+            }
+        }
+    }
+}
+
+void CheckBulletAsteroidHit(Player *player, Asteroid *asteroids) {
+    for (int i = 0; i < MAX_BULLETS; i++) {
+        if (!player->bullets[i].active) continue;
+
+        for (int j = 0; j < MAX_ASTEROIDS; j++) {
+            if (!asteroids[j].active) continue;
+
+            Vector2 diff = Vector2Subtract(player->bullets[i].pos, asteroids[j].pos);
+            float distance = Vector2Length(diff);
+
+            if (distance < asteroids[j].size) {
+                // bullet on hit
+                player->bullets[i].active = false;
+
+                // split!
+                SplitAsteroid(&asteroids[j], asteroids);
+                break;
+            }
+        }
+    }
+}
+
+void CheckPlayerAsteroidHit(Player *player, Asteroid *asteroids, float dt) {
+    float player_radius = 20.0f;
+
+    for (int i = 0; i < MAX_ASTEROIDS; i++) {
+        if (!asteroids[i].active) continue;
+
+        Vector2 diff = Vector2Subtract(player->pos, asteroids[i].pos);
+        float distance = Vector2Length(diff);
+
+        if (distance < (player_radius + asteroids[i].size) && distance > 0) {
+            Vector2 collision_direction = Vector2Normalize(diff);
+
+            float player_bump_force = 300.0f;
+            Vector2 player_bump = Vector2Scale(collision_direction, player_bump_force);
+            player->vel = Vector2Add(player->vel, Vector2Scale(player_bump, dt));
+
+            float asteroid_bump_force = 100.0f;
+            Vector2 asteroid_bump = Vector2Scale(collision_direction, -asteroid_bump_force);
+            asteroids[i].vel = Vector2Add(asteroids[i].vel, Vector2Scale(asteroid_bump, dt));
+        }
+    }
+}
+
 int main(void) {
     SetConfigFlags(FLAG_WINDOW_HIGHDPI);
 
@@ -327,6 +468,9 @@ int main(void) {
             UpdateAsteroid(&asteroids[i], dt);
         }
         SeparateAsteroids(asteroids, MAX_ASTEROIDS, dt);
+
+        CheckBulletAsteroidHit(&player, asteroids);
+        CheckPlayerAsteroidHit(&player, asteroids, dt);
 
         BeginDrawing();
         ClearBackground(NEARBLACK);
