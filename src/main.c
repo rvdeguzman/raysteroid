@@ -41,7 +41,7 @@ typedef enum {
     ASTEROID_SMALL = 1,
     ASTEROID_MEDIUM = 2,
     ASTEROID_LARGE = 4,
-} AsteroidSize;
+} AsteroidSize;  // spaces in array?
 
 // asteroid
 typedef struct {
@@ -49,6 +49,7 @@ typedef struct {
     Vector2 vel;
     bool active;
     AsteroidSize size;
+    int sides;  // for poly shape
     float accel;
     float rot;
     float rspeed;
@@ -145,7 +146,7 @@ void UpdateBullet(Bullet *bullet, float dt) {
 
 void DrawAsteroid(Asteroid *asteroid) {
     if (asteroid->active)
-        DrawPolyLines(asteroid->pos, 8, asteroid->size, asteroid->angle, RAYWHITE);
+        DrawPolyLines(asteroid->pos, asteroid->sides, asteroid->size, asteroid->angle, RAYWHITE);
 }
 
 Asteroid CreateAsteroid() {
@@ -161,32 +162,92 @@ Asteroid CreateAsteroid() {
 
     // empty init
     Vector2 initpos = {0, 0};
-    initpos.x= rand() % SCREEN_WIDTH;
-    initpos.y= rand() % SCREEN_HEIGHT;
+    initpos.x = rand() % SCREEN_WIDTH;
+    initpos.y = rand() % SCREEN_HEIGHT;
     // center of the screen
-    Vector2 centerpos = {(float)SCREEN_WIDTH / 2, (float)SCREEN_HEIGHT / 2}; // should be random from area near center of screen
-    Vector2 initvel = Vector2Subtract(initpos, centerpos); // good enough for now
+    Vector2 centerpos = {(float)SCREEN_WIDTH / 2,
+                         (float)SCREEN_HEIGHT /
+                             2};  // should be random from area near center of screen
+    Vector2 initvel = Vector2Subtract(centerpos, initpos);  // good enough for now
+    initvel = Vector2Normalize(initvel);
+    initvel = Vector2Scale(initvel, 50.0f);
     float rotvel = rand() % 360;
+    int size = 40 + (rand() % (100 - 40 + 1));
+    int sides = 3 + (rand() % (12 - 3 + 1));
 
-    Asteroid asteroid = { 
+    Asteroid asteroid = {
         initpos,
         initvel,
         false,
-        ASTEROID_MEDIUM,
+        size,
+        sides,
         0.0f,
         0.0f,
         rotvel,
         0.0f,
         0.0f,
-        32.0f,
+        8.0f,
     };
     return asteroid;
 }
 
-void UpdateAsteroid(Asteroid *asteroid){
+void UpdateAsteroid(Asteroid *asteroid, float dt) {
+    if (!asteroid->active) return;
 
+    // update position
+    asteroid->pos.x += asteroid->vel.x * dt;
+    asteroid->pos.y += asteroid->vel.y * dt;
 
+    // update rotation
+    asteroid->angle += asteroid->rspeed * dt;
+
+    // update lifetime
+    asteroid->lifetime += dt;
+    if (asteroid->lifetime > asteroid->maxlife) {
+        // make sure it's off-screen
+        if (asteroid->pos.x < -20 || asteroid->pos.x > SCREEN_WIDTH + 20 || asteroid->pos.y < -20 ||
+            asteroid->pos.y > SCREEN_HEIGHT + 20) {
+            asteroid->active = false;
+            printf("asteroid is now inactive");
+        }
+    }
 }
+
+// apply a force to repulse asteroids away from each other
+void SeparateAsteroids(Asteroid *asteroids, int count, float dt) {
+    float force = 150.0f;
+    
+    for (int i = 0; i < count; i++) {
+        if (!asteroids[i].active) continue;
+        
+        Vector2 repulsion = Vector2Zero();
+        int near = 0;
+        
+        for (int j = 0; j < count; j++) {
+            if (i == j || !asteroids[j].active) continue;
+            
+            Vector2 diff = Vector2Subtract(asteroids[i].pos, asteroids[j].pos);
+            float distance = Vector2Length(diff);
+            
+            float radii = asteroids[i].size + asteroids[j].size;
+            
+            if (distance < radii && distance > 0) {
+                Vector2 push_direction = Vector2Normalize(diff);
+                float push_strength = (radii - distance) / radii;
+                Vector2 push = Vector2Scale(push_direction, push_strength * force);
+                repulsion = Vector2Add(repulsion, push);
+                near++;
+            }
+        }
+        
+        if (near > 0) {
+            repulsion = Vector2Scale(repulsion, 1.0f / near);
+            Vector2 repulsevel = Vector2Scale(repulsion, dt);
+            asteroids[i].vel = Vector2Add(asteroids[i].vel, repulsevel);
+        }
+    }
+}
+
 
 int main(void) {
     SetConfigFlags(FLAG_WINDOW_HIGHDPI);
@@ -197,7 +258,7 @@ int main(void) {
     Asteroid asteroids[MAX_ASTEROIDS];
     // initialize asteroids
     for (int i = 0; i < MAX_ASTEROIDS; i++) {
-        asteroids
+        asteroids[i] = CreateAsteroid();
     }
 
     Player player = {(Vector2){400, 300}, (Vector2){0, 0}, 10.0f, 0.2f, 0.0f, 200.0f};
@@ -209,15 +270,36 @@ int main(void) {
     }
 
     float dt = 0.0f;
+    float asteroidTimer = 0.0f;
+    float spawn = 2.0f;
 
     while (!WindowShouldClose()) {
         dt = GetFrameTime();
 
+        asteroidTimer += dt;
+        if (asteroidTimer >= spawn) {
+            for (int i = 0; i < MAX_ASTEROIDS; i++) {
+                if (!asteroids[i].active) {
+                    asteroids[i] = CreateAsteroid();
+                    asteroids[i].active = true;
+                    asteroids[i].lifetime = 0.0f;
+                    break;
+                }
+            }
+            asteroidTimer = 0.0f;
+        }
+
         // update
         UpdatePlayer(&player, dt);
+
         for (int i = 0; i < MAX_BULLETS; i++) {
             UpdateBullet(&player.bullets[i], dt);
         }
+
+        for (int i = 0; i < MAX_ASTEROIDS; i++) {
+            UpdateAsteroid(&asteroids[i], dt);
+        }
+        SeparateAsteroids(asteroids, MAX_ASTEROIDS, dt);
 
         BeginDrawing();
         ClearBackground(NEARBLACK);
@@ -226,6 +308,10 @@ int main(void) {
 
         for (int i = 0; i < MAX_BULLETS; i++) {
             DrawBullet(&player.bullets[i]);
+        }
+
+        for (int i = 0; i < MAX_ASTEROIDS; i++) {
+            DrawAsteroid(&asteroids[i]);
         }
 
         EndDrawing();
